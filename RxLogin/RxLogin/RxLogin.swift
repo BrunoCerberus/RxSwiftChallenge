@@ -14,12 +14,12 @@ extension ViewController {
     
     // Username should be VALID when more than 3 characters
     func isUsernameValid(username: Observable<String>) -> Observable<Bool> {
-        return Observable.just(false)
+        return username.map({$0.count > 3})
     }
     
     // Password should be VALID when more than 3 characters
     func isPasswordValid(password: Observable<String>) -> Observable<Bool> {
-        return Observable.just(false)
+        return password.map({$0.count > 3})
     }
     
     // Button should NEVER be enabled when isLoading
@@ -28,7 +28,17 @@ extension ViewController {
                          isUsernameValid: Observable<Bool>,
                          isPasswordValid: Observable<Bool>) -> Observable<Bool> {
         
-        return Observable.just(false)
+        let inputValid = Observable.combineLatest(isUsernameValid, isPasswordValid) {
+            usernameValid, passwordValid in
+            usernameValid && passwordValid
+        }
+        
+        return Observable.combineLatest(inputValid, isLoading) {
+            inputValid, isLoading in
+            if isLoading {return false}
+            if inputValid {return true}
+            return false
+        }
     }
     
     // Do login using `self.service.login(username: String, password: String) -> Single<Result>`
@@ -38,8 +48,14 @@ extension ViewController {
                  password: Observable<String>,
                  loginAction: Observable<Void>) -> Observable<Result> {
         
-        return Observable.just(Result.failure(message: "Complete o código aqui!"))
+        let input  = Observable.combineLatest(username, password)
+        return loginAction
+            .withLatestFrom(input)
+            .flatMap { username, password in
+                return self.service.login(username: username, password: password)
+                    .trackActivity(self.isLoading)
         
+        }
     }
     
 }
